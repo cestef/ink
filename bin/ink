@@ -420,32 +420,37 @@ suggest() {
     }' | sort -n | head -1 | cut -d' ' -f2
 }
 
-ARGS=''
-while [ $# -gt 0 ]; do
+left=$#
+while [ "$left" -gt 0 ]; do
+  left=$((left - 1))
   case $1 in
-    --json) JSON=1 ;;
-    -q | --quiet) QUIET=$((QUIET + 1)) ;;
-    -qq) QUIET=2 ;;
-    -v | --verbose) VERBOSE=$((VERBOSE + 1)) ;;
-    -vv) VERBOSE=2 ;;
-    -y | --yes) ASSUME_YES=1 ;;
-    --color) shift; COLOR=${1-auto} ;;
-    --color=*) COLOR=${1#--color=} ;;
+    --json) JSON=1; shift ;;
+    -q | --quiet) QUIET=$((QUIET + 1)); shift ;;
+    -qq) QUIET=2; shift ;;
+    -v | --verbose) VERBOSE=$((VERBOSE + 1)); shift ;;
+    -vv) VERBOSE=2; shift ;;
+    -y | --yes) ASSUME_YES=1; shift ;;
+    --color) shift; COLOR=${1-auto}; left=$((left - 1)); shift ;;
+    --color=*) COLOR=${1#--color=}; shift ;;
     --version) printf '%s %s\n' "$ME" "$VERSION"; exit 0 ;;
     -h) paint; short_help; exit 0 ;;
     --help | help) paint; long_help; exit 0 ;;
-    --) shift; while [ $# -gt 0 ]; do ARGS="$ARGS $1"; shift; done; break ;;
+    --)
+      shift
+      while [ "$left" -gt 0 ]; do
+        set -- "$@" "$1"
+        shift
+        left=$((left - 1))
+      done
+      ;;
     -*) paint; fail ink::unknown_flag "unknown flag $1" "run \`$ME -h\`" 2 ;;
-    *) ARGS="$ARGS $1" ;;
+    *) set -- "$@" "$1"; shift ;;
   esac
-  shift
 done
 
 paint
 IDENTITY=${INK_IDENTITY:-identity.txt}
 
-# shellcheck disable=SC2086
-set -- $ARGS
 [ $# -ge 1 ] || { short_help; exit 2; }
 
 want=$1
