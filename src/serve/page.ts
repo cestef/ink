@@ -68,7 +68,7 @@ export class Page {
        collapsing out of the block, so anything inside keeps its own gap. */
     .warn, .diag { border-left: 3px solid; padding: .5rem 0 .5rem .75rem; margin: 1.2rem 0 0; }
     .warn > p { margin: 0; }
-    .warn > button { margin-top: .75rem; }
+    .warn > button, .warn > a { display: inline-block; margin-top: .75rem; }
     /* Whatever follows a warning gets air. A pre sets a tight top margin for
        sitting under a label, which reads as touching when it follows a block. */
     .warn + * { margin-top: .75rem; }

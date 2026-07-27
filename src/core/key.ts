@@ -10,12 +10,12 @@ export class Key {
     {
       kind: 'x25519',
       label: 'X25519',
-      note: 'The age default, and a link short enough to paste anywhere.',
+      note: '62 character link. Opens with any version of age.',
     },
     {
       kind: 'hybrid',
       label: 'Post-quantum hybrid (ML-KEM-768 + X25519)',
-      note: 'Resists a future quantum attacker. Much longer link, and age 1.3 or newer to decrypt.',
+      note: '1959 character link. Needs age 1.3 to decrypt, and resists a future quantum attacker.',
     },
   ];
 

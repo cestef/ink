@@ -131,7 +131,7 @@ export class Ui {
 
   static download(name: string, contents: string): HTMLAnchorElement {
     const url = URL.createObjectURL(new Blob([contents], { type: 'text/plain' }));
-    return Ui.make('a', { href: url, download: name, textContent: `download ${name}` });
+    return Ui.make('a', { href: url, download: name, textContent: `Save ${name}` });
   }
 
   /** Wires a button so a thrown error lands in `#out` instead of the console. */

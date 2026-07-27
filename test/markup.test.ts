@@ -90,6 +90,28 @@ describe('page markup', () => {
   });
 
   /**
+   * The button shipped above two controls that change what it does, so the
+   * retention and the advanced settings read as belonging to whatever came
+   * next rather than to the inbox being created.
+   */
+  test('the create button comes after everything that changes what it creates', async () => {
+    const { create } = await pages();
+    const at = (needle: string) => create.indexOf(needle);
+
+    for (const control of [
+      'id="slug"',
+      'id="title"',
+      'id="method"',
+      'id="fields"',
+      'id="retain"',
+      'id="burn"',
+      'id="kind"',
+    ]) {
+      expect({ control, before: at(control) < at('id="create"') }).toEqual({ control, before: true });
+    }
+  });
+
+  /**
    * The script is the escape hatch from trusting this page, so a page that
    * never mentions it leaves the only trustless route undiscoverable.
    */

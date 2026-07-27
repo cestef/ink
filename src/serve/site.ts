@@ -25,7 +25,8 @@ export class Site {
         entry: 'new',
         title: 'ink',
         heading: 'Ask for a secret.',
-        sub: 'Share the link you get. They send; only you can open it.',
+        // What the form produces, rather than a claim about what it is for.
+        sub: 'You get a link to hand out, a link to read what arrives, and a key file.',
         body: Html.div({ id: 'root', data: { domain: ctx.domain ?? '' } }, [
           Html.label('slug', 'Address'),
           Html.input({ id: 'slug', placeholder: 'acme', autocomplete: 'off', spellcheck: 'false' }),
@@ -53,9 +54,6 @@ export class Site {
           Html.div({ id: 'fields' }),
           Html.div({ class: 'actions' }, [Html.button({ id: 'add' }, 'Add a field')]),
 
-          Html.div({ class: 'actions' }, [Html.button({ id: 'create' }, 'Create inbox')]),
-          Html.div({ class: 'out', id: 'out' }),
-
           Html.label('retain', 'Keep submissions'),
           Site.select(
             'retain',
@@ -68,11 +66,7 @@ export class Site {
               Html.input({ id: 'burn', type: 'checkbox' }),
               Html.el('span', {}, [
                 'Destroy on read',
-                Html.el(
-                  'em',
-                  {},
-                  'Each submission is deleted the moment you open it. There is no second look.',
-                ),
+                Html.el('em', {}, 'Deleted the moment you open it. There is no second look.'),
               ]),
             ]),
             Html.label('kind', 'Key type'),
@@ -82,6 +76,11 @@ export class Site {
             ),
             Html.p('', { class: 'hint', id: 'kind-note' }),
           ]),
+
+          // The action comes after everything that changes what it does. It
+          // used to sit above two of them.
+          Html.div({ class: 'actions' }, [Html.button({ id: 'create' }, 'Create inbox')]),
+          Html.div({ class: 'out', id: 'out' }),
 
           Site.terminal(ctx.domain),
           Site.footer(),

@@ -140,9 +140,18 @@ Ui.guard('create', async () => {
 
   Ui.show(
     'out',
-    Ui.field('Share this', Client.link(slug, recipient)),
-    Ui.field('Keep this', Client.manage(slug, token)),
-    Ui.warn('Save the key file too. It opens every submission with the stock age CLI.'),
-    Ui.make('div', { className: 'actions' }, [Ui.download(`${slug}.identity.txt`, `${identity}\n`)]),
+    Ui.field('Give this out', Client.link(slug, recipient)),
+    Ui.field('Keep this to read what arrives', Client.manage(slug, token)),
+    // The key file is the one thing here that cannot be reissued, so it is
+    // stated as what is lost without it rather than as an instruction.
+    Ui.make('div', { className: 'warn' }, [
+      Ui.make('p', { textContent: 'Save the key file. Nothing here opens without it.' }),
+      Ui.facts([
+        ['Opens with', `age -d -i ${slug}.identity.txt`],
+        ['Also opened by', made.label],
+        ['If both are lost', 'every submission is unreadable, permanently'],
+      ]),
+      Ui.download(`${slug}.identity.txt`, `${identity}\n`),
+    ]),
   );
 });

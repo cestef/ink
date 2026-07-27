@@ -19,12 +19,12 @@ export class Unlock {
     {
       kind: 'passkey',
       label: 'Passkey',
-      note: 'Held by your device or password manager. It asks twice: once to create the passkey, once to use it.',
+      note: 'Held by your device or password manager. Asks twice: once to create it, once to use it.',
     },
     {
       kind: 'passphrase',
       label: 'Passphrase',
-      note: 'Works everywhere, and is only as strong as what you choose.',
+      note: 'Works anywhere. As strong as the one you pick, and nothing recovers it.',
     },
   ];
 
