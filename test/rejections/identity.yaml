@@ -1,0 +1,38 @@
+- name: not armored at all
+  parse: wrapped
+  input: AGE-SECRET-KEY-1QQQQQQQ
+  code: identity.invalid
+  status: 400
+  message: wrapped identity is missing its header
+  mark: { line: 1, column: 0, label: "expected -----BEGIN AGE ENCRYPTED FILE-----" }
+
+- name: header present, footer missing, blamed on the last line
+  parse: wrapped
+  input: "-----BEGIN AGE ENCRYPTED FILE-----\nYWJj\n"
+  code: identity.invalid
+  message: wrapped identity is missing its footer
+  mark: { line: 2, label: "expected -----END AGE ENCRYPTED FILE-----" }
+
+- name: not text
+  parse: wrapped
+  input: 42
+  code: identity.invalid
+  message: wrapped identity must be text
+  marks: 0
+  notes: ["received number"]
+
+- name: title of only whitespace
+  parse: title
+  input: "   "
+  code: title.invalid
+  status: 400
+  message: title is required
+  marks: 0
+
+- name: title past the ceiling is blamed from the limit onward
+  parse: title
+  repeat: 121
+  code: title.invalid
+  message: title must be at most 120 characters
+  mark: { line: 1, column: 120, width: 1 }
+  notes: ["this one is 121"]

@@ -1,0 +1,20 @@
+name: a post-quantum inbox behaves exactly like any other
+inbox:
+  slug: quantum
+  title: pq credentials
+  passphrase: correct-horse-battery-staple
+  kind: hybrid
+steps:
+  - act: submit
+    text: ML-KEM-768 sealed
+    status: 201
+
+  - act: list
+    count: 1
+
+  - act: read
+    at: 0
+    text: ML-KEM-768 sealed
+
+  - act: key
+    status: 200

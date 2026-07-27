@@ -1,0 +1,18 @@
+name: submissions are bounded and never empty
+inbox:
+  slug: limits
+  title: bounded
+  passphrase: correct-horse-battery-staple
+steps:
+  - act: submit
+    bytes: 0
+    status: 400
+    code: submission.empty
+
+  - act: submit
+    bytes: 10485761
+    status: 413
+    code: submission.large
+
+  - act: list
+    count: 0

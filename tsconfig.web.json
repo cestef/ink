@@ -1,0 +1,11 @@
+{
+  // The crypto surface is checked against browser globals only. Bun's types
+  // define their own `Element` for HTMLRewriter, which silently shadows the DOM
+  // one and makes `append` resolve to the wrong overload.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src/web", "src/core"]
+}

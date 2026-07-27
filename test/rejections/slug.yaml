@@ -1,0 +1,54 @@
+- name: below the floor
+  parse: slug
+  input: ab
+  code: slug.invalid
+  status: 400
+  message: address must be 3 to 40 characters
+  mark: { line: 1, column: 0, width: 2, label: too short }
+  help: ["this one is 2"]
+
+- name: above the ceiling
+  parse: slug
+  repeat: 41
+  code: slug.invalid
+  message: address must be 3 to 40 characters
+  mark: { label: too long, width: 41 }
+  help: ["this one is 41"]
+
+- name: uppercase, with the caret on the offending character
+  parse: slug
+  input: acmE
+  code: slug.invalid
+  message: address must be lowercase letters, digits and hyphens
+  marks: 1
+  mark: { line: 1, column: 3, width: 1, text: acmE, label: not allowed here }
+
+- name: leading hyphen is blamed at the front
+  parse: slug
+  input: -acme
+  code: slug.invalid
+  mark: { column: 0, width: 1, label: cannot start with a hyphen }
+
+- name: trailing hyphen is blamed at the end
+  parse: slug
+  input: acme-
+  code: slug.invalid
+  mark: { column: 4, width: 1, label: cannot end with a hyphen }
+
+- name: an address that would shadow the api
+  parse: slug
+  input: api
+  code: slug.reserved
+  status: 400
+  title: reserved address
+  message: '"api" is reserved'
+  mark: { column: 0, width: 3, label: reserved }
+  help: ["this name is kept for mail, DNS or the site itself, so pick another"]
+
+- name: a number is not an address
+  parse: slug
+  input: 42
+  code: slug.invalid
+  message: address must be text
+  marks: 0
+  notes: ["received number"]

@@ -1,0 +1,28 @@
+{
+  "name": "ink",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "dev": "bun run build.ts && bun --hot src/host/local.ts",
+    "dev:cf": "bun run build.ts && wrangler dev",
+    "deploy": "bun run build.ts && wrangler deploy",
+    "check": "bun run typecheck && bun run lint && bun test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
+    "lint": "biome check .",
+    "fix": "biome check --write .",
+    "test": "bun test",
+    "bench": "bun run bench/main.ts"
+  },
+  "dependencies": {
+    "@scure/base": "^2.2.0",
+    "age-encryption": "^0.3.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
+    "@cloudflare/workers-types": "^5.20260727.1",
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.114.0"
+  }
+}

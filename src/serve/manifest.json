@@ -1,0 +1,17 @@
+{
+  "new": {
+    "file": "/js/new-6706d5yf.js",
+    "integrity": "sha384-dqADStEg0YJvkDHBuYlE7bsrAPxUYsKZaDWa9boDVX21W+lXlx3GCuc0l91YpaiQ",
+    "bytes": 175707
+  },
+  "submit": {
+    "file": "/js/submit-etbcxr4k.js",
+    "integrity": "sha384-FFIswJi4HVAf0ONB8OIQBNLumdnZNh1hp2mpkk7lZgyPJldC7IXEeRObDm96d9kx",
+    "bytes": 160713
+  },
+  "manage": {
+    "file": "/js/manage-4qsc503j.js",
+    "integrity": "sha384-foawXEoyeQp3wrMja/nQzpJVEtBYSA3cpLoJARBl3fop56VBMNPvr6ZcUlwwO//X",
+    "bytes": 176943
+  }
+}

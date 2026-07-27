@@ -1,0 +1,28 @@
+name: submitting is open, reading is not
+inbox:
+  slug: authority
+  title: guarded
+  passphrase: correct-horse-battery-staple
+steps:
+  # Anyone may submit. That is the whole point: the sender needs nothing.
+  - act: submit
+    text: hunter2
+    status: 201
+
+  - act: list
+    token: ""
+    status: 403
+    code: token.missing
+
+  - act: list
+    token: "00000000000000000000000000000000"
+    status: 403
+    code: token.invalid
+
+  - act: key
+    token: "00000000000000000000000000000000"
+    status: 403
+    code: token.invalid
+
+  - act: list
+    count: 1

@@ -1,0 +1,21 @@
+name: a stranger submits and the owner reads it back
+inbox:
+  slug: acme
+  title: client credentials
+  passphrase: correct-horse-battery-staple
+steps:
+  - act: submit
+    text: hunter2
+    status: 201
+
+  - act: list
+    count: 1
+
+  - act: read
+    at: 0
+    text: hunter2
+
+  # Reading marks it read, and the mark survives a second listing.
+  - act: list
+    count: 1
+    read: true

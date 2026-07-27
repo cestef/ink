@@ -1,0 +1,23 @@
+name: submissions list newest first
+inbox:
+  slug: newest-first
+  title: three secrets
+  passphrase: correct-horse-battery-staple
+steps:
+  - act: submit
+    text: first
+  - act: submit
+    text: second
+  - act: submit
+    text: third
+
+  - act: list
+    count: 3
+
+  - act: read
+    at: 0
+    text: third
+
+  - act: read
+    at: 2
+    text: first

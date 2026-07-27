@@ -1,0 +1,52 @@
+- name: not text
+  parse: recipient
+  input: 42
+  code: recipient.invalid
+  status: 400
+  message: recipient must be text
+  marks: 0
+  notes: ["received number"]
+
+- name: empty
+  parse: recipient
+  input: ""
+  code: recipient.invalid
+  message: recipient is empty or implausibly long
+  notes: ["received 0"]
+
+- name: implausibly long
+  parse: recipient
+  repeat: 4097
+  code: recipient.invalid
+  message: recipient is empty or implausibly long
+  notes: ["received 4097"]
+
+- name: no bech32 separator
+  parse: recipient
+  input: agexyz
+  code: recipient.invalid
+  message: recipient is not valid bech32
+  mark: { line: 1, column: 0, label: checksum or charset failed }
+
+- name: a single flipped character fails the checksum
+  parse: recipient
+  input: age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5cu47q
+  code: recipient.invalid
+  message: recipient is not valid bech32
+  mark: { label: checksum or charset failed }
+
+- name: valid bech32, but not an age prefix
+  parse: recipient
+  input: foo1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzr5ww7
+  code: recipient.invalid
+  message: '"foo" is not an age recipient prefix'
+  mark: { column: 0, width: 3, label: unrecognised prefix }
+  help: ["accepted: age1, age1pq1, age1tag1, age1tagpq1"]
+
+- name: right prefix, wrong payload size
+  parse: recipient
+  input: age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqar9jk6
+  code: recipient.invalid
+  message: a x25519 recipient carries 32 bytes
+  mark: { label: wrong payload size }
+  notes: ["decoded 31"]

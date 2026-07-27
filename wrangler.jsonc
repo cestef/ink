@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ink",
+  "main": "src/host/workers.ts",
+  "compatibility_date": "2026-07-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Every inbox gets its own origin under this. Unset it and everything falls
+  // back to paths, which is what local development uses.
+  "vars": { "INK_DOMAIN": "uses.ink" },
+  "routes": [
+    // The apex creates inboxes. Wrangler manages its DNS record.
+    { "pattern": "uses.ink", "custom_domain": true },
+    // One origin per inbox. A wildcard cannot be a custom domain, so this is a
+    // route and the wildcard DNS record is created alongside it.
+    { "pattern": "*.uses.ink/*", "zone_name": "uses.ink" }
+  ],
+  "assets": {
+    "directory": "./public",
+    // Hashed filenames, so the bundles are immutable and served before the Worker runs.
+    "not_found_handling": "none"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ink",
+      "database_id": "5d6bf920-ad9e-4f10-b142-a191de16fe8a"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BLOBS",
+      "bucket_name": "ink-blobs"
+    }
+  ]
+}
