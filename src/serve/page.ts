@@ -29,19 +29,22 @@ export class Page {
     label, .label { display: block; margin-top: 1.2rem; }
 
     /* Native controls, given a consistent box and a visible focus ring. */
-    input, select, textarea, button {
+    input, select, textarea, button, a.button {
       font: inherit; color: inherit; background: transparent;
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
       border-radius: 4px; padding: .45rem .55rem;
     }
+    /* A download is an action, and looks like one. It has to be an anchor to
+       carry the object URL, which is the only reason it is not a button. */
+    a.button { display: inline-block; text-decoration: none; }
     input:not([type=checkbox]), select, textarea {
       display: block; width: 100%; max-width: 100%; margin-top: .25rem;
     }
-    input:hover, select:hover, textarea:hover, button:hover:not(:disabled) {
+    input:hover, select:hover, textarea:hover, a.button:hover, button:hover:not(:disabled) {
       border-color: color-mix(in srgb, currentColor 60%, transparent);
     }
     :focus-visible { outline: 2px solid; outline-offset: 1px; }
-    button { padding: .45rem .9rem; cursor: pointer; }
+    button, a.button { padding: .45rem .9rem; cursor: pointer; }
     button:disabled { opacity: .5; cursor: not-allowed; }
     select { padding-right: .3rem; }
     textarea { min-height: 7rem; }
@@ -63,6 +66,10 @@ export class Page {
     pre { font-size: .85rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
           border: 1px solid; padding: .5rem; margin: .25rem 0 0; }
     .field { margin-top: 1.2rem; }
+    /* Name on the left, its one action on the right, on the same line. */
+    .head { display: flex; gap: .75rem; align-items: baseline; justify-content: space-between; }
+    .head .label { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .head > button, .head > a { flex: none; }
 
     /* Vertical padding, not just the left inset: it also stops child margins
        collapsing out of the block, so anything inside keeps its own gap. */

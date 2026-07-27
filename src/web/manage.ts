@@ -177,7 +177,7 @@ class Vault {
 
   /** Adding a device is the reason the key is wrapped rather than derived. */
   private enrol(): HTMLElement {
-    const button = Ui.make('button', { type: 'button', textContent: 'Add a passkey (asks twice)' });
+    const button = Ui.make('button', { type: 'button', textContent: 'Add a passkey' });
 
     button.addEventListener('click', async () => {
       button.disabled = true;
@@ -254,12 +254,7 @@ class Vault {
     const plain = await decrypter.decrypt(await this.client.ciphertext(view.id), 'uint8array');
 
     return Parcel.unpack(plain).map((item) =>
-      item.text === null
-        ? Ui.make('div', { className: 'field' }, [
-            Ui.make('div', { className: 'label', textContent: item.name }),
-            Ui.make('div', { className: 'actions' }, [Ui.save(item.name, item.bytes)]),
-          ])
-        : Ui.field(item.name, item.text),
+      item.text === null ? Ui.file(item.name, item.bytes) : Ui.field(item.name, item.text),
     );
   }
 }

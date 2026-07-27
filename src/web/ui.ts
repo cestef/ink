@@ -75,12 +75,27 @@ export class Ui {
     return list;
   }
 
-  /** A value worth keeping: shown in full, with one click to take it away. */
+  /**
+   * A value worth keeping: shown in full, with one click to take it away. The
+   * button sits on the name's line rather than under the value, so a stack of
+   * these does not become a column of one-button rows.
+   */
   static field(label: string, value: string): HTMLElement {
     return Ui.make('div', { className: 'field' }, [
-      Ui.make('div', { className: 'label', textContent: label }),
+      Ui.head(label, Ui.copy(value)),
       Ui.make('pre', { textContent: value }),
-      Ui.make('div', { className: 'actions' }, [Ui.copy(value)]),
+    ]);
+  }
+
+  /** The same, for something that is bytes rather than text to read. */
+  static file(name: string, bytes: Uint8Array): HTMLElement {
+    return Ui.make('div', { className: 'field' }, [Ui.head(name, Ui.save(name, bytes))]);
+  }
+
+  private static head(label: string, action: HTMLElement): HTMLElement {
+    return Ui.make('div', { className: 'head' }, [
+      Ui.make('div', { className: 'label', textContent: label }),
+      action,
     ]);
   }
 
@@ -124,14 +139,14 @@ export class Ui {
   }
 
   /** A file the owner can take away, without it ever touching the network. */
-  static save(name: string, bytes: Uint8Array): HTMLAnchorElement {
+  static save(name: string, bytes: Uint8Array, label = 'Save'): HTMLAnchorElement {
     const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)]));
-    return Ui.make('a', { href: url, download: name, textContent: `Save ${name}` });
+    return Ui.make('a', { className: 'button', href: url, download: name, textContent: label });
   }
 
   static download(name: string, contents: string): HTMLAnchorElement {
     const url = URL.createObjectURL(new Blob([contents], { type: 'text/plain' }));
-    return Ui.make('a', { href: url, download: name, textContent: `Save ${name}` });
+    return Ui.make('a', { className: 'button', href: url, download: name, textContent: `Save ${name}` });
   }
 
   /** Wires a button so a thrown error lands in `#out` instead of the console. */
