@@ -124,6 +124,7 @@ export class Submission {
 
     const rows = await query
       .order('createdAt', 'desc')
+      .stable('desc')
       .limit(Submission.PAGE + 1)
       .all();
 

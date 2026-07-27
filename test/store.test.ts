@@ -147,6 +147,31 @@ describe('query builder', () => {
     expect(short.more).toBe(false);
   });
 
+  /**
+   * Submissions arriving in the same millisecond used to come back either way
+   * round, which only showed up once the suite got fast enough to write them
+   * that quickly. A timestamp in milliseconds is not an ordering.
+   */
+  test('rows written in the same millisecond still list newest first', async () => {
+    const db = await Fixture.db();
+    const inbox = await Fixture.inbox(db, 'sametick');
+    const at = Date.now();
+
+    for (const id of ['s1', 's2', 's3', 's4', 's5']) {
+      await Submission.TABLE.insert(db, {
+        id,
+        inboxId: inbox.id,
+        blobKey: 'ff',
+        size: 1,
+        createdAt: at,
+        readAt: null,
+      });
+    }
+
+    const page = await Submission.list(db, inbox);
+    expect(page.submissions.map((row) => row.id)).toEqual(['s5', 's4', 's3', 's2', 's1']);
+  });
+
   test('a nullable column round trips null', async () => {
     const db = await Fixture.db();
     await Submission.TABLE.insert(db, {

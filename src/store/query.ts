@@ -12,6 +12,7 @@ import type { Table } from './table.ts';
 export class Query<S extends Table.Shape> {
   private readonly matches: Query.Match[] = [];
   private ordering: string | null = null;
+  private tiebreak: string | null = null;
   private cap: number | null = null;
 
   constructor(
@@ -33,8 +34,26 @@ export class Query<S extends Table.Shape> {
   }
 
   order(field: keyof S & string, direction: Query.Dir = 'asc'): this {
-    this.ordering = `${Name.snake(field)} ${direction === 'desc' ? 'DESC' : 'ASC'}`;
+    this.ordering = `${Name.snake(field)} ${Query.direction(direction)}`;
     return this;
+  }
+
+  /**
+   * Breaks ties by insertion order.
+   *
+   * SQLite returns rows with equal sort keys in whatever order it likes, so a
+   * timestamp in milliseconds is not an ordering: two rows written in the same
+   * millisecond come back either way round. `rowid` is monotonic per table, so
+   * it turns "newest first" into something that is actually true rather than
+   * usually true.
+   */
+  stable(direction: Query.Dir = 'asc'): this {
+    this.tiebreak = `rowid ${Query.direction(direction)}`;
+    return this;
+  }
+
+  private static direction(direction: Query.Dir): string {
+    return direction === 'desc' ? 'DESC' : 'ASC';
   }
 
   limit(rows: number): this {
@@ -86,7 +105,8 @@ export class Query<S extends Table.Shape> {
   }
 
   private sql(): string {
-    const order = this.ordering ? ` ORDER BY ${this.ordering}` : '';
+    const by = [this.ordering, this.tiebreak].filter((part) => part !== null);
+    const order = by.length > 0 ? ` ORDER BY ${by.join(', ')}` : '';
     const limit = this.cap === null ? '' : ` LIMIT ${this.cap}`;
     return `SELECT ${this.table.selection} FROM ${this.table.name}${this.filter()}${order}${limit}`;
   }
