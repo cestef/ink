@@ -65,9 +65,13 @@ export class Page {
     .field { margin-top: 1.2rem; }
 
     /* Vertical padding, not just the left inset: it also stops child margins
-       collapsing out of the block, so a button inside keeps its own gap. */
-    .warn, .diag { border-left: 3px solid; padding: .1rem 0 .1rem .75rem; margin: 1.2rem 0 0; }
+       collapsing out of the block, so anything inside keeps its own gap. */
+    .warn, .diag { border-left: 3px solid; padding: .5rem 0 .5rem .75rem; margin: 1.2rem 0 0; }
+    .warn > p { margin: 0; }
     .warn > button { margin-top: .75rem; }
+    /* Whatever follows a warning gets air. A pre sets a tight top margin for
+       sitting under a label, which reads as touching when it follows a block. */
+    .warn + * { margin-top: .75rem; }
     .diag strong { display: block; }
     /* Only the lines inside a diagnostic tighten up. Listing .warn here too
        reset the margin above, which is a rule cancelling the one before it. */

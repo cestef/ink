@@ -32,12 +32,17 @@ class Downgrade {
       accept.remove();
     });
 
+    // The button belongs inside the block, not after it: it is the answer to
+    // the warning, and a sibling would sit outside the rule that frames it.
     Ui.show(
       'warn',
-      Ui.warn(
-        'This link arrived without its key, so the only key available is the one this server offers, which the server could have chosen. Ask the recipient for the full link, the one ending in a # and a key.',
-      ),
-      accept,
+      Ui.make('div', { className: 'warn' }, [
+        Ui.make('p', {
+          textContent:
+            'This link arrived without its key, so the only key available is the one this server offers, which the server could have chosen. Ask the recipient for the full link, the one ending in a # and a key.',
+        }),
+        accept,
+      ]),
     );
   }
 
