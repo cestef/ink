@@ -1,4 +1,4 @@
-import type { Route } from '../core/route.ts';
+import { Host } from '../core/host.ts';
 import { Routes } from '../core/routes.ts';
 import { Fault } from './fault.ts';
 import { Ui } from './ui.ts';
@@ -80,8 +80,10 @@ export class Client {
 
   async submit(ciphertext: Uint8Array): Promise<void> {
     const response = await this.send(
-      Routes.api.submissions,
-      { slug: this.slug },
+      this.at(
+        () => Routes.site.submissions.path(),
+        (slug) => Routes.api.submissions.path({ slug }),
+      ),
       {
         method: 'POST',
         headers: { 'content-type': Client.BYTES },
@@ -92,75 +94,112 @@ export class Client {
     await Client.json<{ id: string }>(response);
   }
 
+  private key(): string {
+    return this.at(
+      () => Routes.site.key.path(),
+      (slug) => Routes.api.key.path({ slug }),
+    );
+  }
+
   async wrappings(): Promise<Client.Wrapping[]> {
-    const response = await this.send(Routes.api.key, { slug: this.slug }, {});
+    const response = await this.send(this.key(), {});
     const body = await Client.json<{ wrappings: Client.Wrapping[] }>(response);
     return body.wrappings;
   }
 
   async enrol(wrapping: Client.New['wrappings'][number]): Promise<Client.Wrapping> {
-    const response = await this.send(
-      Routes.api.key,
-      { slug: this.slug },
-      {
-        method: 'POST',
-        headers: { 'content-type': Client.JSON },
-        body: JSON.stringify({ wrappings: [wrapping] }),
-      },
-    );
+    const response = await this.send(this.key(), {
+      method: 'POST',
+      headers: { 'content-type': Client.JSON },
+      body: JSON.stringify({ wrappings: [wrapping] }),
+    });
     const body = await Client.json<{ wrapping: Client.Wrapping }>(response);
     return body.wrapping;
   }
 
   /** Deletes one submission. */
   async discard(id: string): Promise<void> {
-    await Client.ok(await this.send(Routes.api.submission, { slug: this.slug, id }, { method: 'DELETE' }));
+    const url = this.at(
+      () => Routes.site.submission.path({ id }),
+      (slug) => Routes.api.submission.path({ slug, id }),
+    );
+    await Client.ok(await this.send(url, { method: 'DELETE' }));
   }
 
   /** Deletes the inbox and everything it holds. */
   async destroy(): Promise<number> {
-    const response = await this.send(Routes.api.inbox, { slug: this.slug }, { method: 'DELETE' });
-    return (await Client.json<{ deleted: number }>(response)).deleted;
+    const url = this.at(
+      () => Routes.site.inbox.path(),
+      (slug) => Routes.api.inbox.path({ slug }),
+    );
+    return (await Client.json<{ deleted: number }>(await this.send(url, { method: 'DELETE' }))).deleted;
   }
 
   /** Stops or resumes new submissions, without touching what is held. */
   async close(closed: boolean): Promise<boolean> {
-    const response = await this.send(
-      Routes.api.state,
-      { slug: this.slug },
-      { method: 'POST', headers: { 'content-type': Client.JSON }, body: JSON.stringify({ closed }) },
+    const url = this.at(
+      () => Routes.site.state.path(),
+      (slug) => Routes.api.state.path({ slug }),
     );
+    const response = await this.send(url, {
+      method: 'POST',
+      headers: { 'content-type': Client.JSON },
+      body: JSON.stringify({ closed }),
+    });
     return (await Client.json<{ closed: boolean }>(response)).closed;
   }
 
   /** Mints a new manage link and invalidates the current one. */
   async rotate(): Promise<string> {
-    const response = await this.send(Routes.api.token, { slug: this.slug }, { method: 'POST' });
-    return (await Client.json<{ token: string }>(response)).token;
+    const url = this.at(
+      () => Routes.site.token.path(),
+      (slug) => Routes.api.token.path({ slug }),
+    );
+    return (await Client.json<{ token: string }>(await this.send(url, { method: 'POST' }))).token;
   }
 
   async forget(id: string): Promise<void> {
-    const response = await this.send(Routes.api.wrapping, { slug: this.slug, id }, { method: 'DELETE' });
-    await Client.ok(response);
+    const url = this.at(
+      () => Routes.site.wrapping.path({ id }),
+      (slug) => Routes.api.wrapping.path({ slug, id }),
+    );
+    await Client.ok(await this.send(url, { method: 'DELETE' }));
   }
 
   async submissions(): Promise<Client.Page> {
-    const response = await this.send(Routes.api.submissions, { slug: this.slug }, {});
-    return Client.json<Client.Page>(response);
+    const url = this.at(
+      () => Routes.site.submissions.path(),
+      (slug) => Routes.api.submissions.path({ slug }),
+    );
+    return Client.json<Client.Page>(await this.send(url, {}));
   }
 
   async ciphertext(id: string): Promise<Uint8Array> {
-    const response = await this.send(Routes.api.submission, { slug: this.slug, id }, {});
+    const url = this.at(
+      () => Routes.site.submission.path({ id }),
+      (slug) => Routes.api.submission.path({ slug, id }),
+    );
+    const response = await this.send(url, {});
     await Client.ok(response);
     return new Uint8Array(await response.arrayBuffer());
   }
 
-  private send<S extends string>(
-    route: Route<S>,
-    params: Route.Args<S>,
-    init: RequestInit,
-  ): Promise<Response> {
-    return fetch(route.path(params), { ...init, headers: { ...this.headers(), ...init.headers } });
+  /**
+   * On an inbox host the slug is the hostname, so the path must not repeat it.
+   * Asking for the path form here would have the inbox spliced in twice by the
+   * time the router sees it.
+   */
+  private get hosted(): boolean {
+    const domain = Ui.data('root', 'domain');
+    return Host.of(location.hostname, domain || null).kind === 'inbox';
+  }
+
+  private at(byHost: () => string, byPath: (slug: string) => string): string {
+    return this.hosted ? byHost() : byPath(this.slug);
+  }
+
+  private send(url: string, init: RequestInit): Promise<Response> {
+    return fetch(url, { ...init, headers: { ...this.headers(), ...init.headers } });
   }
 
   private headers(): Record<string, string> {

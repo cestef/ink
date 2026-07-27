@@ -1,17 +1,17 @@
 {
   "new": {
-    "file": "/js/new-6706d5yf.js",
-    "integrity": "sha384-dqADStEg0YJvkDHBuYlE7bsrAPxUYsKZaDWa9boDVX21W+lXlx3GCuc0l91YpaiQ",
-    "bytes": 175707
+    "file": "/js/new-ev584qz8.js",
+    "integrity": "sha384-7HV3PUa4HmGfMhOHvUkVpzkhcA8Mw07oflskarEMZVrWIXBAXi0dciBhaI9GmJPf",
+    "bytes": 178425
   },
   "submit": {
-    "file": "/js/submit-etbcxr4k.js",
-    "integrity": "sha384-FFIswJi4HVAf0ONB8OIQBNLumdnZNh1hp2mpkk7lZgyPJldC7IXEeRObDm96d9kx",
-    "bytes": 160713
+    "file": "/js/submit-25h99xy1.js",
+    "integrity": "sha384-g3/AQf5wya5C0HdAlP0wZYHq9O+Bxs2bzTHgWwgXzPZQcYNsva4Z/vjCTMZ0YPhD",
+    "bytes": 163432
   },
   "manage": {
-    "file": "/js/manage-4qsc503j.js",
-    "integrity": "sha384-foawXEoyeQp3wrMja/nQzpJVEtBYSA3cpLoJARBl3fop56VBMNPvr6ZcUlwwO//X",
-    "bytes": 176943
+    "file": "/js/manage-9heaj8ca.js",
+    "integrity": "sha384-KzYBCwVaNeqiAkCjr8CyPQvfbFUpZ1ysAhnjbv3V/MnDo7JZwA5pePPNA+rFkfgI",
+    "bytes": 179663
   }
 }

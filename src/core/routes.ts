@@ -8,11 +8,24 @@ export namespace Routes {
     manage: Route.of('/i/:slug/manage'),
   } as const;
 
-  /** The same pages, addressed by subdomain instead of by path. */
+  /**
+   * The same endpoints as `api`, addressed on the inbox's own host, where the
+   * slug is the hostname and must not also be in the path.
+   *
+   * Every entry here has a counterpart in `api`, and `Tenant.rewrite` turns one
+   * into the other. A browser on `acme.uses.ink` has to use these: asking for
+   * the path form would get the inbox spliced in a second time.
+   */
   export const site = {
     submit: Route.of('/'),
     manage: Route.of('/manage'),
+    inbox: Route.of('/api'),
+    token: Route.of('/api/token'),
+    state: Route.of('/api/state'),
+    key: Route.of('/api/key'),
+    wrapping: Route.of('/api/key/:id'),
     submissions: Route.of('/api/submission'),
+    submission: Route.of('/api/submission/:id'),
   } as const;
 
   export const api = {

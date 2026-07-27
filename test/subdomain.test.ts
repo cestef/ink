@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Host } from '../src/core/host.ts';
+import type { Route } from '../src/core/route.ts';
 import { Routes } from '../src/core/routes.ts';
 import { Slug } from '../src/core/slug.ts';
 import { Tenant } from '../src/serve/tenant.ts';
@@ -57,6 +58,43 @@ describe('rewriting', () => {
     expect(at('https://ink.test/')).toBe('/');
     expect(at('https://ink.test/api/inbox')).toBe('/api/inbox');
     expect(at('https://localhost:8787/i/acme')).toBe('/i/acme');
+  });
+});
+
+/**
+ * The two route tables have to stay twins. A browser on an inbox host that
+ * reaches for the path form gets the inbox spliced in twice, which is how
+ * `/api/inbox/hey/inbox/hey/key` reached production: every manage page on a
+ * subdomain was broken, and nothing here compared the two tables.
+ */
+describe('the host form and the path form describe the same endpoints', () => {
+  const tenant = new Tenant(DOMAIN);
+  const rewrite = (path: string) => tenant.rewrite(new URL(`https://acme.${DOMAIN}${path}`)).pathname;
+  const fill = <S extends string>(route: Route<S>) =>
+    route.template.replace(/:slug/g, 'acme').replace(/:id/g, 'abc123');
+
+  const twins = [
+    ['inbox', Routes.site.inbox, Routes.api.inbox],
+    ['token', Routes.site.token, Routes.api.token],
+    ['state', Routes.site.state, Routes.api.state],
+    ['key', Routes.site.key, Routes.api.key],
+    ['wrapping', Routes.site.wrapping, Routes.api.wrapping],
+    ['submissions', Routes.site.submissions, Routes.api.submissions],
+    ['submission', Routes.site.submission, Routes.api.submission],
+    ['submit', Routes.site.submit, Routes.page.inbox],
+    ['manage', Routes.site.manage, Routes.page.manage],
+  ] as const;
+
+  for (const [name, host, path] of twins) {
+    test(`${name} on a subdomain rewrites to its path form`, () => {
+      expect({ [name]: rewrite(fill(host)) }).toEqual({ [name]: fill(path) });
+    });
+  }
+
+  test('every api endpoint an inbox owns has a host form', () => {
+    const owned = Object.entries(Routes.api).filter(([, route]) => route.template.includes(':slug'));
+    const missing = owned.filter(([name]) => !(name in Routes.site));
+    expect(missing.map(([name]) => name)).toEqual([]);
   });
 });
 
