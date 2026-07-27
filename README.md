@@ -122,10 +122,41 @@ and what a closed inbox tells a sender), mint a new manage link (which invalidat
 old one, the only way to revoke a leaked link), or delete the inbox and everything in
 it.
 
+**Export all** writes every submission to one tar, still sealed, alongside a README
+saying how to open it. It is deliberately ciphertext rather than plaintext: dropping
+every secret into a downloads folder would undo the only thing this does, and the
+archive still opens with `age -d -i identity.txt` on any machine, with or without ink.
+On a destroy-on-read inbox it asks first, because exporting reads.
+
 Every inbox has a retention period, set when you create it and defaulting to **7 days**.
 Expiry is enforced when a submission is read, not by a cron, so a lapsed secret is
 unreadable even if no sweep has run; the bytes go on the next write to that inbox.
 **Destroy on read** is available too: the submission is deleted the moment you open it.
+
+## From a terminal
+
+`bin/ink` is one POSIX shell script covering every operation the pages offer, over the
+same API, without running any of their JavaScript. That is the point rather than a
+convenience: the browser gets its code from the server it is protecting you from. It is
+served from the apex, so there is nothing to clone:
+
+```sh
+curl -fsSL https://uses.ink/ink -o ink && chmod +x ink
+```
+
+| | |
+|---|---|
+| `ink new <address> <title>` | generates a key, wraps it with a passphrase, prints all three links |
+| `ink send <submit-link> [file…]` | seals and posts; reads stdin when given no files |
+| `ink list <manage-link>` | what has arrived |
+| `ink read <manage-link> <id> [dir]` | decrypts one submission into `dir` |
+| `ink export <manage-link> [out.tar]` | every submission, still sealed |
+| `ink rm` / `close` / `open` / `rotate` / `destroy` | the rest of the manage page |
+
+It needs `curl`, `age`, `tar` and `jq`. Links carry their secret after the `#`, so quote
+them or the shell eats it. `--json` puts the raw response on stdout while logs stay on
+stderr, so it pipes into `jq`; `-y` skips confirmation on the destructive commands, and
+absent a terminal they refuse rather than assume yes.
 
 ## Limits
 
@@ -165,6 +196,13 @@ printf %s 'YOUR SECRET' \
       https://ink.example/api/inbox/acme/submission
 ```
 
+Or use the script, which does every operation the pages do and never loads them:
+
+```sh
+curl -fsSL https://uses.ink/ink -o ink && chmod +x ink
+./ink new acme 'Client credentials'
+```
+
 That works because ink stores an age file, not a private blob format. Short of that:
 the crypto surface is a framework-free bundle, the build is byte-for-byte deterministic,
 every run prints an SRI hash, and each page pins its script by that hash, so what is
@@ -182,6 +220,7 @@ src/serve    routing, HTML, cache policy
 src/store    typed tables, literal migrations
 src/blob     ciphertext storage, R2 or filesystem or memory
 src/host     local (Bun, bun:sqlite) and workers (D1, R2)
+bin/ink      the terminal client, copied to public/ink at build time
 test/        YAML scenarios plus their runners in test/harness
 bench/       percentile benchmarks
 ```
