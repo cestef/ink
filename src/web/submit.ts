@@ -1,4 +1,5 @@
 import * as age from 'age-encryption';
+import { Size } from '../core/size.ts';
 import { Client } from './client.ts';
 import { Fault } from './fault.ts';
 import { Parcel } from './parcel.ts';
@@ -21,10 +22,7 @@ class Downgrade {
     const send = Ui.el<HTMLButtonElement>('send');
     send.disabled = true;
 
-    const accept = Ui.make('button', {
-      type: 'button',
-      textContent: 'I understand, encrypt to the key this server offers',
-    });
+    const accept = Ui.make('button', { type: 'button', textContent: 'Use the server key anyway' });
 
     accept.addEventListener('click', () => {
       Downgrade.accepted = true;
@@ -37,10 +35,11 @@ class Downgrade {
     Ui.show(
       'warn',
       Ui.make('div', { className: 'warn' }, [
-        Ui.make('p', {
-          textContent:
-            'This link arrived without its key, so the only key available is the one this server offers, which the server could have chosen. Ask the recipient for the full link, the one ending in a # and a key.',
-        }),
+        Ui.make('p', { textContent: 'This link has no key after its #.' }),
+        Ui.facts([
+          ['Would encrypt to', `${pinned.slice(0, 20)}…`],
+          ['Chosen by', 'this server, not the sender'],
+        ]),
         accept,
       ]),
     );
@@ -73,10 +72,7 @@ class Bypass {
       `      ${Client.endpoint(slug)}`,
     ].join('\n');
 
-    const body: Ui.Child[] = [
-      Ui.make('summary', { textContent: 'Send it from a terminal instead' }),
-      Ui.make('p', { className: 'hint', textContent: 'Same result, without running any of our code.' }),
-    ];
+    const body: Ui.Child[] = [Ui.make('summary', { textContent: 'Send it from a terminal instead' })];
 
     /**
      * Whoever opens this block is here because they would rather not trust the
@@ -84,13 +80,7 @@ class Bypass {
      * from the link, would be the one substitution the whole product is against
      * and the only place it would go unremarked.
      */
-    if (!fromLink) {
-      body.push(
-        Ui.warn(
-          'The key below is not from your link, because your link has none. It is the key this server offers, and the server could have chosen it. Running this command trusts the server exactly as much as running the page does.',
-        ),
-      );
-    }
+    if (!fromLink) body.push(Ui.warn('This key is the server’s, not from your link.'));
 
     body.push(Ui.make('pre', { textContent: command }));
 
@@ -114,22 +104,25 @@ Ui.guard('send', async () => {
 
   await Client.anonymous(slug).submit(ciphertext);
 
-  /**
-   * Show what was actually produced. The claim on this page is that the words
-   * left as something unreadable, and this is that claim, in the reader's own
-   * submission, rather than a reassuring sentence.
-   */
-  const sealed = Ui.make('pre', { textContent: age.armor.encode(ciphertext) });
   for (const field of Parcel.fields()) Ui.wipe(`f-${field.key}`);
   if (Parcel.fields().length === 0) Ui.wipe('secret');
 
+  /**
+   * The ciphertext stays available but folded away. It is the evidence for what
+   * this page claims, and worth one click to anyone who wants it; unfolded by
+   * default it is a screen of base64 between the reader and knowing it worked.
+   */
   Ui.show(
     'out',
-    Ui.note('Sealed and sent. This is what the server received, and it cannot open it.'),
-    sealed,
-    Ui.make('p', {
-      className: 'hint',
-      textContent: `Only the holder of ${recipient.slice(0, 16)}… can read it again.`,
-    }),
+    Ui.note('Sent.'),
+    Ui.facts([
+      ['Sealed to', `${recipient.slice(0, 20)}…`],
+      ['Size', Size.human(ciphertext.byteLength)],
+      ['Readable by', 'whoever holds the key, and nobody else'],
+    ]),
+    Ui.make('details', {}, [
+      Ui.make('summary', { textContent: 'What the server received' }),
+      Ui.make('pre', { textContent: age.armor.encode(ciphertext) }),
+    ]),
   );
 });

@@ -2,10 +2,13 @@ import type { Field } from '../core/field.ts';
 import { Key } from '../core/key.ts';
 import { Retention } from '../core/retention.ts';
 import { Routes } from '../core/routes.ts';
+import { Size } from '../core/size.ts';
 import { Slug } from '../core/slug.ts';
 import { Unlock } from '../core/unlock.ts';
+import { When } from '../core/when.ts';
 import { Inbox } from '../store/inbox.ts';
 import { Schema } from '../store/schema.ts';
+import { Submission } from '../store/submission.ts';
 import type { Api } from './api.ts';
 import type { App } from './app.ts';
 import { Html } from './html.ts';
@@ -108,7 +111,9 @@ export class Site {
         mark: `ink / ${view.slug}`,
         title: `${view.title} · ink`,
         heading: view.title,
-        sub: 'Sealed in this tab, before anything leaves your machine.',
+        // Facts a sender acts on: how long it lives and how much fits. The
+        // reassurance this replaced told them nothing they could use.
+        sub: Site.terms(inbox.policy()),
         body: Html.div(
           {
             id: 'root',
@@ -138,7 +143,7 @@ export class Site {
         mark: `ink / ${view.slug}`,
         title: `${view.title} · ink`,
         heading: view.title,
-        sub: 'Decrypted in this tab, never on the server.',
+        sub: null,
         // The unlock control is filled in once this inbox says how it opens, so
         // nobody is shown a passphrase box for an inbox that uses a passkey.
         body: Html.div({ id: 'root', data: { slug: view.slug, domain: ctx.domain ?? '' } }, [
@@ -154,6 +159,16 @@ export class Site {
 
   static readonly SOURCE = 'https://github.com/cestef/ink';
   static readonly AGE = 'https://age-encryption.org';
+
+  /** What a sender is agreeing to, in the fewest words that still say it. */
+  private static terms(policy: Inbox.Policy): string {
+    const kept = policy.burn
+      ? 'Destroyed when opened'
+      : policy.retain === null
+        ? 'Kept until deleted'
+        : `Kept ${When.span(policy.retain)}`;
+    return `${kept} · ${Size.human(Submission.MAX)} max`;
+  }
 
   /**
    * The same operations, without this page. Worth offering on the way in rather

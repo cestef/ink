@@ -191,6 +191,26 @@ describe.skipIf(!present)('interop with the stock age CLI', () => {
     expect(new TextDecoder().decode(entry?.bytes)).toBe('from the terminal');
   });
 
+  /**
+   * bin/ink tars a directory rather than a list of names, which is how a sender
+   * adds files the script was never told about. GNU tar then writes a `./`
+   * member first, and that reached the manage page as an extra empty field with
+   * a Save link that saved nothing.
+   */
+  test('a directory tarred whole unpacks to its files and nothing else', async () => {
+    const box = `${home}/box`;
+    await mkdir(box, { recursive: true });
+    await writeFile(`${box}/secret.txt`, 'hunter2');
+    await writeFile(`${box}/notes.txt`, 'rotate quarterly');
+    await Cli.run(['tar', '-b', '1', '-cf', `${home}/whole.tar`, '-C', box, '.']);
+
+    const entries = Tar.unpack(new Uint8Array(await Bun.file(`${home}/whole.tar`).arrayBuffer()));
+
+    expect(entries.map((one) => one.name).sort()).toEqual(['notes.txt', 'secret.txt']);
+    const secret = entries.find((one) => one.name === 'secret.txt');
+    expect(new TextDecoder().decode(secret?.bytes)).toBe('hunter2');
+  });
+
   test('a key born in age-keygen -pq is one ink accepts', async () => {
     const identity = await Cli.keygen(true);
     const recipient = await Cli.recipient(identity);

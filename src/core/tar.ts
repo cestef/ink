@@ -17,6 +17,7 @@ export class Tar {
   static readonly MAGIC = 'ustar\0';
   static readonly VERSION = '00';
   static readonly FILE = '0';
+  static readonly HERE = './';
   /** Fixed, so an archive says nothing about when it was made. */
   static readonly MTIME = 0;
   static readonly MODE = 0o644;
@@ -44,11 +45,15 @@ export class Tar {
       const header = archive.subarray(at, at + Tar.BLOCK);
       if (header.every((byte) => byte === 0)) break;
 
-      const name = Tar.text(header, 0, Tar.NAME_MAX);
+      const name = Tar.name(Tar.text(header, 0, Tar.NAME_MAX));
       const size = Tar.octal(header, 124, 12);
+      const kind = Tar.text(header, 156, 1);
       at += Tar.BLOCK;
 
-      if (Tar.text(header, 156, 1) === Tar.FILE || name.length > 0) {
+      // Regular files only. A tar written by anything other than this file has
+      // directory entries in it: `tar -cf - .` emits a `./` before the members,
+      // and treating that as a submitted field showed an empty one on the page.
+      if (Tar.regular(kind) && name.length > 0) {
         entries.push({ name, bytes: archive.slice(at, at + size) });
       }
 
@@ -56,6 +61,21 @@ export class Tar {
     }
 
     return entries;
+  }
+
+  /** Old archives write NUL rather than '0' for an ordinary file. */
+  private static regular(kind: string): boolean {
+    return kind === Tar.FILE || kind === '' || kind === '\0';
+  }
+
+  /**
+   * The name as a reader should see it. `tar -cf - .` prefixes every member
+   * with `./`, which is an artefact of how the archive was made rather than
+   * part of what was sent.
+   */
+  private static name(raw: string): string {
+    const trimmed = raw.startsWith(Tar.HERE) ? raw.slice(Tar.HERE.length) : raw;
+    return trimmed.endsWith('/') ? '' : trimmed;
   }
 
   private static header(entry: Tar.Entry): Uint8Array {

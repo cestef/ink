@@ -77,8 +77,18 @@ export class Page {
        reset the margin above, which is a rule cancelling the one before it. */
     .diag p { margin: .2rem 0 0; }
 
+    /* Label left, value right, on one grid so values line up down the column
+       and a row is read across rather than parsed out of a sentence. */
+    .facts { display: grid; grid-template-columns: auto 1fr; gap: .2rem .75rem;
+             margin: .6rem 0 0; font-size: .9rem; }
+    .facts dt { opacity: .7; }
+    .facts dd { margin: 0; overflow-wrap: anywhere; }
+
     ul { list-style: none; padding: 0; margin-top: 1.2rem; }
     li { border-top: 1px solid; padding: .75rem 0; }
+    /* Inside a row the parts belong to each other, so they sit closer than
+       blocks on the page do. */
+    li .field, li .actions, .field .actions { margin-top: .5rem; }
     details { margin-top: 2rem; }
 
     footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid; font-size: .85rem; }
@@ -133,7 +143,7 @@ export class Page {
         Html.el('main', {}, [
           Html.div({ class: 'mark' }, options.mark ?? 'ink'),
           Html.h1(options.heading),
-          Html.p(options.sub, { class: 'sub' }),
+          options.sub === null ? null : Html.p(options.sub, { class: 'sub' }),
           options.body,
         ]),
         Html.script({
@@ -167,7 +177,8 @@ export namespace Page {
     readonly entry: Page.Entry;
     readonly title: string;
     readonly heading: string;
-    readonly sub: string;
+    /** Null when the page has nothing fixed to say and fills it in itself. */
+    readonly sub: string | null;
     readonly body: Html.Child;
     /** The eyebrow above the heading. Defaults to the product name. */
     readonly mark?: string;

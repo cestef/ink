@@ -1,6 +1,8 @@
 import * as age from 'age-encryption';
 import { Archive } from '../core/archive.ts';
+import { Size } from '../core/size.ts';
 import type { Unlock } from '../core/unlock.ts';
+import { When } from '../core/when.ts';
 import { Client } from './client.ts';
 import { Keyring } from './keyring.ts';
 import { Parcel } from './parcel.ts';
@@ -22,12 +24,11 @@ class Vault {
 
   async render(): Promise<void> {
     const page = await this.client.submissions();
-    const capped = page.more ? [Ui.warn(`Showing the newest ${page.limit}. There are more.`)] : [];
+    const capped = page.more ? [Ui.warn(`Showing the newest ${page.limit} of more.`)] : [];
 
     Ui.show(
       'out',
-      Ui.note(page.submissions.length === 0 ? 'Nothing sent yet.' : `${page.submissions.length} sealed`),
-      Ui.make('p', { className: 'hint', textContent: Vault.policy(page.policy) }),
+      Ui.facts(Vault.summary(page)),
       ...capped,
       Ui.make('div', { className: 'actions' }, [
         this.enrol(),
@@ -36,16 +37,36 @@ class Vault {
       ]),
       this.settings(),
     );
-    Ui.show('list', ...page.submissions.map((view) => this.item(view)));
+    Ui.show('list', ...page.submissions.map((view) => this.item(view, page.policy)));
   }
 
-  private static policy(policy: Client.Policy): string {
-    const kept =
-      policy.retain === null
-        ? 'Kept until you delete them'
-        : `Deleted after ${Math.round(policy.retain / 3_600_000)}h`;
-    const burnt = policy.burn ? `${kept}, and destroyed as soon as you open them` : kept;
-    return policy.closed ? `Closed to new submissions. ${burnt}` : burnt;
+  private static summary(page: Client.Page): Ui.Fact[] {
+    const now = Date.now();
+    const sent = page.submissions;
+    const unread = sent.filter((view) => view.readAt === null).length;
+    const bytes = sent.reduce((total, view) => total + view.size, 0);
+    const oldest = sent[sent.length - 1];
+
+    return [
+      ['Held', Vault.held(sent.length, unread)],
+      ['Size', sent.length === 0 ? null : Size.human(bytes)],
+      ['Newest', sent[0] ? When.ago(sent[0].createdAt, now) : null],
+      ['Oldest', oldest && sent.length > 1 ? When.ago(oldest.createdAt, now) : null],
+      ['Retention', Vault.retention(page.policy)],
+      ['Accepting', page.policy.closed ? 'no, closed' : 'yes'],
+    ];
+  }
+
+  private static held(count: number, unread: number): string {
+    if (count === 0) return 'nothing yet';
+    if (unread === 0) return `${count}, all read`;
+    if (unread === count) return `${count}, none read`;
+    return `${count}, ${unread} unread`;
+  }
+
+  private static retention(policy: Client.Policy): string {
+    if (policy.burn) return 'destroyed on read';
+    return policy.retain === null ? 'until deleted' : When.span(policy.retain);
   }
 
   /**
@@ -177,8 +198,10 @@ class Vault {
     return button;
   }
 
-  private item(view: Client.View): HTMLElement {
-    const body = Ui.make('div', {}, [Ui.make('pre', { textContent: '—' })]);
+  private item(view: Client.View, policy: Client.Policy): HTMLElement {
+    // Empty until it is opened. A placeholder box per row is a column of
+    // nothing, and the row already says there is something sealed here.
+    const body = Ui.make('div', {});
     const open = Ui.make('button', { type: 'button', textContent: 'Decrypt' });
     const drop = Ui.make('button', { type: 'button', textContent: 'Delete' });
 
@@ -193,11 +216,13 @@ class Vault {
       }
     });
 
-    const row = Ui.make('li', {}, [
-      Ui.make('div', { className: 'meta', textContent: Vault.when(view) }),
-      body,
-      Ui.make('div', { className: 'actions' }, [open, drop]),
-    ]);
+    const meta = Ui.make('div', { className: 'meta', textContent: Vault.when(view) });
+    // The exact timestamp is one hover away rather than occupying the row.
+    meta.title = When.exact(view.createdAt);
+
+    const row = Ui.make('li', {}, [meta, body, Ui.make('div', { className: 'actions' }, [open, drop])]);
+
+    if (policy.burn) open.textContent = 'Decrypt and destroy';
 
     drop.addEventListener('click', async () => {
       drop.disabled = true;
@@ -214,8 +239,9 @@ class Vault {
   }
 
   private static when(view: Client.View): string {
-    const sent = `${new Date(view.createdAt).toLocaleString()} · ${view.size} bytes`;
-    return view.readAt === null ? sent : `${sent} · read ${new Date(view.readAt).toLocaleString()}`;
+    const now = Date.now();
+    const read = view.readAt === null ? 'unread' : `read ${When.ago(view.readAt, now)}`;
+    return `${When.ago(view.createdAt, now)} · ${Size.human(view.size)} · ${read}`;
   }
 
   /**

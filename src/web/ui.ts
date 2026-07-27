@@ -59,6 +59,22 @@ export class Ui {
     return Ui.make('p', { className: 'warn', textContent: text });
   }
 
+  /**
+   * The state of something, as aligned pairs. This is what a sentence of prose
+   * was doing badly: a reader wants the number, and wants to find it in the
+   * same place every time.
+   */
+  static facts(pairs: readonly Ui.Fact[]): HTMLElement {
+    const list = Ui.make('dl', { className: 'facts' });
+
+    for (const [key, value] of pairs) {
+      if (value === null) continue;
+      list.append(Ui.make('dt', { textContent: key }), Ui.make('dd', { textContent: value }));
+    }
+
+    return list;
+  }
+
   /** A value worth keeping: shown in full, with one click to take it away. */
   static field(label: string, value: string): HTMLElement {
     return Ui.make('div', { className: 'field' }, [
@@ -151,4 +167,6 @@ export class Ui {
 
 export namespace Ui {
   export type Child = Node | string;
+  /** A null value drops the row, so a caller can list what may not apply. */
+  export type Fact = readonly [string, string | null];
 }
