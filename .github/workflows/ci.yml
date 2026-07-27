@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A queued deploy for an older commit is worth cancelling; a queued check is not
+# worth running twice for the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # Bundles are built before the checks, not after: the page pins each one
+      # by hash, and `test/integrity.test.ts` compares what is on disk against
+      # what the manifest recorded.
+      - run: bun run build
+
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun test
+
+      # The interop tests skip themselves when the age binary is absent, which
+      # is silent by design and worth surfacing: CI is not currently proving the
+      # format claim. Install age in this job to change that.
+      - name: note what did not run
+        if: always()
+        run: echo "::notice::interop tests skip without the age binary installed"
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deploying without credentials is not a failure, it is a repository that
+      # has not opted in yet. Fail the job only when a deploy was actually
+      # attempted and went wrong.
+      - name: is deployment configured
+        id: guard
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOUDFLARE_API_TOKEN is not set, skipping deploy"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.guard.outputs.ready == 'true'
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+        if: steps.guard.outputs.ready == 'true'
+
+      - run: bun run build
+        if: steps.guard.outputs.ready == 'true'
+
+      - name: deploy
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy
