@@ -1,4 +1,5 @@
 import * as age from 'age-encryption';
+import { Archive } from '../core/archive.ts';
 import type { Unlock } from '../core/unlock.ts';
 import { Client } from './client.ts';
 import { Keyring } from './keyring.ts';
@@ -28,7 +29,11 @@ class Vault {
       Ui.note(page.submissions.length === 0 ? 'Nothing sent yet.' : `${page.submissions.length} sealed`),
       Ui.make('p', { className: 'hint', textContent: Vault.policy(page.policy) }),
       ...capped,
-      Ui.make('div', { className: 'actions' }, [this.enrol(), this.shut(page.policy.closed)]),
+      Ui.make('div', { className: 'actions' }, [
+        this.enrol(),
+        this.shut(page.policy.closed),
+        this.exporter(page.policy.burn),
+      ]),
       this.settings(),
     );
     Ui.show('list', ...page.submissions.map((view) => this.item(view)));
@@ -60,6 +65,56 @@ class Vault {
         button.replaceWith(this.shut(now));
       } catch (cause) {
         button.replaceWith(Ui.fault(cause));
+      }
+    });
+
+    return button;
+  }
+
+  /**
+   * Everything the inbox holds, sealed, as one tar. Exported as ciphertext
+   * rather than plaintext on purpose: writing every secret to a downloads
+   * folder would undo the only thing this does, and the archive still opens
+   * with age on any machine.
+   */
+  private exporter(burns: boolean): HTMLElement {
+    const button = Ui.make('button', { type: 'button', textContent: 'Export all' });
+
+    button.addEventListener('click', async () => {
+      // Exporting reads, and on a burn inbox reading destroys. Nobody should
+      // discover that from an empty list afterwards.
+      if (
+        burns &&
+        !confirm(
+          'This inbox destroys submissions when they are read. Exporting will read every one, and they will be gone afterwards. Continue?',
+        )
+      ) {
+        return;
+      }
+
+      button.disabled = true;
+      const said = button.textContent;
+      try {
+        const page = await this.client.submissions();
+        const items: Archive.Item[] = [];
+
+        for (const [at, view] of page.submissions.entries()) {
+          button.textContent = `Exporting ${at + 1} of ${page.submissions.length}`;
+          items.push({
+            id: view.id,
+            createdAt: view.createdAt,
+            bytes: await this.client.ciphertext(view.id),
+          });
+        }
+
+        const slug = Ui.data('root', 'slug');
+        const at = new Date();
+        button.replaceWith(Ui.save(Archive.name(slug, at), Archive.pack(slug, items, at)));
+      } catch (cause) {
+        button.replaceWith(Ui.fault(cause));
+      } finally {
+        button.textContent = said;
+        button.disabled = false;
       }
     });
 

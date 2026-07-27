@@ -79,6 +79,9 @@ export class Site {
             ),
             Html.p('', { class: 'hint', id: 'kind-note' }),
           ]),
+
+          Site.terminal(ctx.domain),
+          Site.footer(),
         ]),
       }),
     );
@@ -147,6 +150,45 @@ export class Site {
     });
 
     return app;
+  }
+
+  static readonly SOURCE = 'https://github.com/cestef/ink';
+  static readonly AGE = 'https://age-encryption.org';
+
+  /**
+   * The same operations, without this page. Worth offering on the way in rather
+   * than as a footnote: a sender who does not trust the browser is exactly the
+   * reader this product is for, and the script is how they never load it.
+   */
+  private static terminal(domain: string | null | undefined): Html {
+    const origin = domain ? `https://${domain}` : 'http://localhost:8787';
+    const install = [
+      `curl -fsSL ${origin}/ink -o ink`,
+      'chmod +x ink',
+      '',
+      `./ink new acme 'Client credentials'`,
+    ].join('\n');
+
+    return Html.el('details', {}, [
+      Html.el('summary', {}, 'Use it from a terminal'),
+      Html.p('One POSIX shell script over the same API. It needs curl, age, tar and jq.', {
+        class: 'hint',
+      }),
+      Html.el('pre', {}, install),
+      Html.el('p', { class: 'hint' }, [
+        'Then ',
+        Html.el('code', {}, 'ink --help'),
+        ' for the rest: send, list, read, export, rotate, destroy.',
+      ]),
+    ]);
+  }
+
+  private static footer(): Html {
+    return Html.el('footer', {}, [
+      Html.el('a', { href: Site.SOURCE }, 'Source'),
+      Html.el('a', { href: `${Site.SOURCE}#readme` }, 'How it works'),
+      Html.el('a', { href: Site.AGE, rel: 'noreferrer' }, 'age'),
+    ]);
   }
 
   /** An inbox that asks for nothing in particular gets one free-text box. */

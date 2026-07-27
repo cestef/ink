@@ -64,7 +64,10 @@ export class Page {
           border: 1px solid; padding: .5rem; margin: .25rem 0 0; }
     .field { margin-top: 1.2rem; }
 
-    .warn, .diag { border-left: 3px solid; padding-left: .75rem; margin: 1.2rem 0 0; }
+    /* Vertical padding, not just the left inset: it also stops child margins
+       collapsing out of the block, so a button inside keeps its own gap. */
+    .warn, .diag { border-left: 3px solid; padding: .1rem 0 .1rem .75rem; margin: 1.2rem 0 0; }
+    .warn > button { margin-top: .75rem; }
     .diag strong { display: block; }
     /* Only the lines inside a diagnostic tighten up. Listing .warn here too
        reset the margin above, which is a rule cancelling the one before it. */
@@ -73,6 +76,9 @@ export class Page {
     ul { list-style: none; padding: 0; margin-top: 1.2rem; }
     li { border-top: 1px solid; padding: .75rem 0; }
     details { margin-top: 2rem; }
+
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid; font-size: .85rem; }
+    footer a { margin-right: 1rem; }
 
     .out:empty { display: none; }
     [hidden] { display: none !important; }

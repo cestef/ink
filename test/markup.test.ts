@@ -89,6 +89,28 @@ describe('page markup', () => {
     expect(manage).toContain('id="unlock"');
   });
 
+  /**
+   * The script is the escape hatch from trusting this page, so a page that
+   * never mentions it leaves the only trustless route undiscoverable.
+   */
+  test('the home page says the terminal route exists and where to get it', async () => {
+    const world = await World.make('ink.test');
+    const create = await (await world.fetch(Routes.page.home, undefined)).text();
+
+    expect(create).toContain('Use it from a terminal');
+    // The install URL follows the domain the server is actually serving, so a
+    // deployment somewhere else does not hand out a link to production.
+    expect(create).toContain('curl -fsSL https://ink.test/ink -o ink');
+    expect(create).toContain('<code>ink --help</code>');
+  });
+
+  test('the home page links to the source it asks people to trust', async () => {
+    const { create } = await pages();
+    for (const href of ['https://github.com/cestef/ink', 'https://age-encryption.org']) {
+      expect({ href, present: create.includes(`href="${href}"`) }).toEqual({ href, present: true });
+    }
+  });
+
   test('the key type control is a native select, so it stays keyboard usable', async () => {
     const { create } = await pages();
     expect(create).toContain('<select id="kind">');

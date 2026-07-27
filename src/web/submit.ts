@@ -59,7 +59,7 @@ class Downgrade {
  * because what ink stores is an age file rather than a private blob format.
  */
 class Bypass {
-  static show(target: string): void {
+  static show(target: string, fromLink: boolean): void {
     const command = [
       `printf %s 'YOUR SECRET' \\`,
       `  | age -e -r ${target} \\`,
@@ -68,20 +68,34 @@ class Bypass {
       `      ${Client.endpoint(slug)}`,
     ].join('\n');
 
-    Ui.show(
-      'bypass',
-      Ui.make('details', {}, [
-        Ui.make('summary', { textContent: 'Send it from a terminal instead' }),
-        Ui.make('p', { className: 'hint', textContent: 'Same result, without running any of our code.' }),
-        Ui.make('pre', { textContent: command }),
-      ]),
-    );
+    const body: Ui.Child[] = [
+      Ui.make('summary', { textContent: 'Send it from a terminal instead' }),
+      Ui.make('p', { className: 'hint', textContent: 'Same result, without running any of our code.' }),
+    ];
+
+    /**
+     * Whoever opens this block is here because they would rather not trust the
+     * page. Handing them a key the server picked, printed as though it came
+     * from the link, would be the one substitution the whole product is against
+     * and the only place it would go unremarked.
+     */
+    if (!fromLink) {
+      body.push(
+        Ui.warn(
+          'The key below is not from your link, because your link has none. It is the key this server offers, and the server could have chosen it. Running this command trusts the server exactly as much as running the page does.',
+        ),
+      );
+    }
+
+    body.push(Ui.make('pre', { textContent: command }));
+
+    Ui.show('bypass', Ui.make('details', {}, body));
   }
 }
 
 const recipient = fragment || pinned;
 if (!fragment) Downgrade.offer();
-Bypass.show(recipient);
+Bypass.show(recipient, Boolean(fragment));
 
 Ui.guard('send', async () => {
   if (!fragment) Downgrade.check();

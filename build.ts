@@ -13,6 +13,10 @@ export class Build {
   static readonly PUBLIC = '/js';
   static readonly ALG = 'sha384';
   static readonly MANIFEST = 'src/serve/manifest.json';
+  static readonly CLI = 'bin/ink';
+  /** Served from the apex, so the install line is one short URL and not a raw
+   *  GitHub path that dies whenever a branch is renamed. */
+  static readonly CLI_OUT = 'public/ink';
 
   static async run(): Promise<void> {
     // Bundles are content-addressed, so old ones linger and get deployed as
@@ -57,9 +61,13 @@ export class Build {
 
     await Bun.write(Build.MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
 
+    const cli = Bun.file(Build.CLI);
+    await Bun.write(Build.CLI_OUT, cli);
+
     for (const [entry, asset] of Object.entries(manifest)) {
       console.error(`${entry.padEnd(8)} ${String(asset.bytes).padStart(7)} B  ${asset.integrity}`);
     }
+    console.error(`${'cli'.padEnd(8)} ${String(cli.size).padStart(7)} B  ${Build.CLI_OUT}`);
   }
 }
 

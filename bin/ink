@@ -1,0 +1,463 @@
+#!/usr/bin/env sh
+set -eu
+
+ME=${0##*/}
+VERSION=1.0.0
+
+COLOR=auto
+QUIET=0
+VERBOSE=0
+JSON=0
+ASSUME_YES=0
+
+catalog() {
+  cat <<'EOF'
+new|<address> <title>|Create an inbox and print its links
+send|<submit-link> [file...]|Seal and send; reads stdin when given no files
+list|<manage-link>|What has arrived
+read|<manage-link> <id> [dir]|Decrypt one submission into dir (default .)
+export|<manage-link> [out.tar]|Every submission, still sealed
+rm|<manage-link> <id>|Delete one submission
+close|<manage-link>|Stop accepting new submissions
+open|<manage-link>|Start accepting again
+rotate|<manage-link>|Mint a new manage link, retire the current one
+destroy|<manage-link>|Delete the inbox and everything in it
+EOF
+}
+
+commands() { catalog | cut -d'|' -f1; }
+usage_of() { catalog | awk -F'|' -v c="$1" '$1 == c { print c " " $2 }'; }
+
+color_on() {
+  case $COLOR in
+    never) return 1 ;;
+    always) return 0 ;;
+  esac
+  [ -z "${NO_COLOR-}" ] && [ -t 2 ]
+}
+
+sgr() { printf '\033[%sm' "$1"; }
+
+paint() {
+  if color_on; then
+    C_OK=$(sgr 32) C_FAIL=$(sgr 31) C_WARN=$(sgr 33) C_INFO=$(sgr 36)
+    C_ID=$(sgr 36) C_PATH=$(sgr 34) C_NUM=$(sgr 35) C_DIM=$(sgr 2) C_OFF=$(sgr 0)
+  else
+    C_OK='' C_FAIL='' C_WARN='' C_INFO='' C_ID='' C_PATH='' C_NUM='' C_DIM='' C_OFF=''
+  fi
+}
+
+tag() { printf '%s%4s%s  ' "$2" "$1" "$C_OFF" >&2; }
+say() { printf '%s\n' "$1" >&2; }
+
+ok() { [ "$QUIET" -ge 1 ] || { tag ok "$C_OK"; say "$1"; }; }
+warn() { [ "$QUIET" -ge 2 ] || { tag warn "$C_WARN"; say "$1"; }; }
+info() { [ "$QUIET" -ge 1 ] || { tag info "$C_INFO"; say "$1"; }; }
+step() { [ "$VERBOSE" -ge 1 ] && { tag run "$C_INFO"; say "$1"; }; return 0; }
+
+fail() {
+  tag fail "$C_FAIL"
+  printf '%s%s%s  %s\n' "$C_DIM" "$1" "$C_OFF" "$2" >&2
+  [ -n "${3-}" ] && printf '      %shelp:%s %s\n' "$C_DIM" "$C_OFF" "$3" >&2
+  exit "${4:-1}"
+}
+
+usage_error() { fail ink::usage "$1" "${2-}" 2; }
+
+expect() {
+  least=$1 most=$2 given=$3 name=$4
+  [ "$given" -ge "$least" ] || usage_error "$(usage_of "$name")"
+  [ "$most" = any ] || [ "$given" -le "$most" ] || usage_error "$(usage_of "$name")"
+}
+
+need() {
+  for tool in "$@"; do
+    command -v "$tool" > /dev/null 2>&1 ||
+      fail ink::missing_tool "$tool is not installed" 'ink needs curl, age, tar and jq'
+  done
+}
+
+workdir() {
+  WORK=$(mktemp -d)
+  trap 'rm -rf "$WORK"' EXIT
+  trap 'rm -rf "$WORK"; exit 130' INT
+}
+
+stanza() {
+  while [ $# -ge 2 ]; do
+    printf '      %s%-11s%s %s\n' "$C_DIM" "$1" "$C_OFF" "$2" >&2
+    shift 2
+  done
+}
+
+listing() {
+  sed "s/^/      $C_DIM/;s/\$/$C_OFF/" >&2
+}
+
+base_of() {
+  bare=${1%%#*}
+  origin=$(printf '%s' "$bare" | sed -E 's#^(https?://[^/]+).*#\1#')
+  case ${bare#"$origin"} in
+    /i/*) printf '%s/api/inbox/%s' "$origin" "$(printf '%s' "${bare#"$origin"/i/}" | cut -d/ -f1)" ;;
+    *) printf '%s/api' "$origin" ;;
+  esac
+}
+
+secret_of() {
+  case $1 in
+    *\#*) printf '%s' "${1#*#}" ;;
+    *) fail ink::link_incomplete 'that link has no secret after its #' \
+      'copy the whole link, including everything after the #' ;;
+  esac
+}
+
+host_of() { printf '%s' "$1" | sed -E 's#https?://([^/]+).*#\1#'; }
+
+open_link() {
+  TOKEN=$(secret_of "$1")
+  BASE=$(base_of "$1")
+}
+
+field() { printf '%s' "$1" | jq -r "$2" 2> /dev/null; }
+
+diagnose() {
+  body=$1 fallback=$2 status=$3
+  code=$(field "$body" '.error.code // empty' || true)
+  message=$(field "$body" '.error.message // empty' || true)
+  hint=$(field "$body" '.error.help[0] // empty' || true)
+  fail "ink::$(printf '%s' "${code:-$fallback}" | tr . _)" \
+    "${message:-the server answered $status}" "$hint"
+}
+
+request() {
+  method=$1 url=$2 token=$3 dest=$4
+  shift 4
+  step "$method $url"
+  curl -sS -X "$method" -H "x-ink-token: $token" -o "$dest" -w '%{http_code}' "$url" "$@"
+}
+
+call() {
+  method=$1 url=$2 token=$3
+  shift 3
+  reply=$(mktemp)
+  status=$(request "$method" "$url" "$token" "$reply" "$@")
+  body=$(cat "$reply")
+  rm -f "$reply"
+  case $status in
+    2*) printf '%s' "$body" ;;
+    *) diagnose "$body" request_failed "$status" ;;
+  esac
+}
+
+send_json() {
+  call "$1" "$2" "$3" -H 'content-type: application/json' --data-binary "$4"
+}
+
+download() {
+  status=$(request "$1" "$2" "$3" "$4")
+  case $status in
+    2*) ;;
+    *) diagnose "$(cat "$4")" request_failed "$status" ;;
+  esac
+}
+
+confirm() {
+  [ "$ASSUME_YES" = 1 ] && return 0
+  [ -t 0 ] || fail ink::needs_confirmation "refusing to $1 without a terminal" \
+    'pass --yes to confirm non-interactively' 2
+  tag fail "$C_FAIL"
+  say "$1?"
+  printf '      %sthis cannot be undone%s [y/N]: ' "$C_DIM" "$C_OFF" >&2
+  read -r answer
+  case $answer in
+    y | Y | yes) return 0 ;;
+    *) fail ink::cancelled 'left alone' ;;
+  esac
+}
+
+run_new() {
+  expect 2 2 $# new
+  need curl age age-keygen jq
+  host=${INK_HOST:-https://uses.ink}
+
+  [ -e "$IDENTITY" ] && fail ink::key_exists "$IDENTITY already exists" \
+    'refusing to overwrite a key; move it or set INK_IDENTITY'
+
+  step 'generating an X25519 identity'
+  age-keygen -o "$IDENTITY" 2> /dev/null
+  chmod 600 "$IDENTITY"
+  recipient=$(age-keygen -y "$IDENTITY")
+
+  info 'choose a passphrase, it wraps the key just made'
+  wrapped=$(age -p -a < "$IDENTITY")
+
+  body=$(jq -n --arg s "$1" --arg t "$2" --arg r "$recipient" --arg w "$wrapped" \
+    '{slug:$s,title:$t,recipient:$r,retain:"week",burn:false,
+      wrappings:[{kind:"passphrase",label:"passphrase",wrapped:$w}]}')
+  created=$(send_json POST "$host/api/inbox" '' "$body")
+  token=$(field "$created" .token)
+
+  origin=$(printf '%s' "$host" | sed -E "s#^(https?://)#\\1$1.#")
+  ok "created $C_ID$1$C_OFF"
+  stanza \
+    'send this' "$origin/#$recipient" \
+    'keep this' "$origin/manage#$token" \
+    'key file' "$IDENTITY"
+}
+
+run_send() {
+  expect 1 any $# send
+  need curl age tar
+  link=$1
+  shift
+  recipient=$(secret_of "$link")
+  target=$(base_of "$link")/submission
+  workdir
+
+  if [ $# -eq 0 ]; then
+    [ -t 0 ] && info 'reading the secret from stdin, end with ctrl-d'
+    cat > "$WORK/secret.txt"
+  else
+    for file in "$@"; do
+      [ -f "$file" ] || fail ink::no_such_file "no file at $file"
+      cp "$file" "$WORK/$(basename "$file")"
+    done
+  fi
+
+  step "sealing to $recipient"
+  status=$(tar -b 1 -cf - -C "$WORK" . 2> /dev/null | age -e -r "$recipient" \
+    | curl -sS --data-binary @- -H 'content-type: application/octet-stream' \
+      -o "$WORK/reply" -w '%{http_code}' "$target")
+
+  case $status in
+    2*) ok "sealed and sent to $C_ID$(host_of "$link")$C_OFF" ;;
+    *) diagnose "$(cat "$WORK/reply")" send_refused "$status" ;;
+  esac
+}
+
+run_list() {
+  expect 1 1 $# list
+  need curl jq column
+  open_link "$1"
+  body=$(call GET "$BASE/submission" "$TOKEN")
+
+  [ "$JSON" = 1 ] && { printf '%s\n' "$body"; return 0; }
+
+  count=$(field "$body" '.submissions | length')
+  [ "$count" = 0 ] && { ok 'nothing sent yet'; return 0; }
+
+  field "$body" '
+    .submissions[]
+    | [ .id
+      , (.size | tostring + " B")
+      , (.createdAt / 1000 | strftime("%Y-%m-%d %H:%M"))
+      , (if .readAt then "read" else "unread" end)
+      ] | @tsv' | column -t -s "$(printf '\t')"
+
+  ok "$count submission(s)"
+}
+
+run_read() {
+  expect 2 3 $# read
+  need curl age tar
+  [ -f "$IDENTITY" ] || fail ink::no_key "no key file at $IDENTITY" \
+    'set INK_IDENTITY to wherever you saved it'
+
+  open_link "$1"
+  into=${3:-.}
+  mkdir -p "$into"
+  workdir
+
+  download GET "$BASE/submission/$2" "$TOKEN" "$WORK/sealed"
+  age -d -i "$IDENTITY" < "$WORK/sealed" | tar -x -C "$into"
+
+  ok "extracted into $C_PATH$into$C_OFF"
+  [ "$QUIET" -ge 1 ] || find "$into" -maxdepth 1 -type f -printf '%f\n' 2> /dev/null | listing
+}
+
+run_export() {
+  expect 1 2 $# export
+  need curl jq tar
+  open_link "$1"
+  out=${2:-ink-export-$(date -u +%Y%m%dT%H%M%SZ).tar}
+  workdir
+
+  count=0
+  index=$(call GET "$BASE/submission" "$TOKEN")
+  for id in $(field "$index" '.submissions[].id'); do
+    count=$((count + 1))
+    step "fetching $id"
+    download GET "$BASE/submission/$id" "$TOKEN" "$WORK/$(printf '%03d' "$count")-$id.age"
+  done
+
+  cat > "$WORK/README.txt" <<EOF
+$count submission(s), exactly as the server held them. It could not read any of it.
+
+Each one opens with the stock age CLI:
+
+    age -d -i identity.txt 001-....age | tar -x
+EOF
+
+  tar -cf "$out" -C "$WORK" .
+  ok "exported $C_NUM$count$C_OFF submission(s) to $C_PATH$out$C_OFF"
+}
+
+run_rm() {
+  expect 2 2 $# rm
+  need curl jq
+  open_link "$1"
+  confirm "delete submission $2"
+  call DELETE "$BASE/submission/$2" "$TOKEN" > /dev/null
+  ok "deleted $C_ID$2$C_OFF"
+}
+
+set_state() {
+  closed=$1
+  shift
+  need curl jq
+  open_link "$1"
+  send_json POST "$BASE/state" "$TOKEN" "{\"closed\":$closed}" > /dev/null
+}
+
+run_close() {
+  expect 1 1 $# close
+  set_state true "$@"
+  ok 'closed to new submissions'
+}
+
+run_open() {
+  expect 1 1 $# open
+  set_state false "$@"
+  ok 'accepting submissions again'
+}
+
+run_rotate() {
+  expect 1 1 $# rotate
+  need curl jq
+  open_link "$1"
+  body=$(call POST "$BASE/token" "$TOKEN")
+  ok 'minted a new manage link, the old one no longer works'
+  stanza 'manage link' "${1%%#*}#$(field "$body" .token)"
+}
+
+run_destroy() {
+  expect 1 1 $# destroy
+  need curl jq
+  open_link "$1"
+  confirm 'delete this inbox and every submission in it'
+  body=$(call DELETE "$BASE" "$TOKEN")
+  ok "deleted the inbox and $C_NUM$(field "$body" .deleted)$C_OFF submission(s)"
+}
+
+short_help() {
+  cat <<EOF
+Usage: $ME <command> [options]
+
+Send and read secrets that only you can open.
+
+Commands:
+$(catalog | awk -F'|' '{ printf "  %-9s %s\n", $1, $3 }')
+
+Run \`$ME --help\` for details.
+EOF
+}
+
+long_help() {
+  cat <<EOF
+Usage: $ME <command> [options]
+
+Send and read secrets that only you can open. Everything is encrypted before it
+leaves this machine, with age, and the server never holds a key. This script
+talks to the same API the web pages do, without running any of their code.
+
+Commands:
+$(catalog | awk -F'|' '{ printf "  %-31s %s\n", $1 " " $2, $3 }')
+
+Output:
+  --json            Emit the raw response on stdout
+  -q, --quiet       Result only; -qq for nothing but the exit code
+  -v, --verbose     Show each request as it happens
+  --color <when>    always, never or auto (default auto)
+
+Other:
+  -y, --yes         Skip confirmation on destructive commands
+  -h, --help        This page
+  --version         Print the version
+
+Examples:
+  $ME new acme 'Client credentials'
+  printf 'hunter2' | $ME send 'https://acme.uses.ink/#age1...'
+  $ME send 'https://acme.uses.ink/#age1...' key.pem notes.txt
+  $ME list 'https://acme.uses.ink/manage#3f9c...'
+  $ME read 'https://acme.uses.ink/manage#3f9c...' 9a1b ./secrets
+  $ME export 'https://acme.uses.ink/manage#3f9c...' backup.tar
+
+A link carries its own secret after the #, so quote it or the shell will eat it.
+
+Environment:
+  INK_HOST       Where inboxes are created (default https://uses.ink)
+  INK_IDENTITY   Path to the key file (default ./identity.txt)
+  NO_COLOR       Any value turns colour off
+
+Exit codes:
+  0  fine    1  failed    2  bad usage    130  interrupted
+
+See also: age(1), https://github.com/cestef/ink
+EOF
+}
+
+suggest() {
+  commands | awk -v w="$1" '
+    function min(a, b) { return a < b ? a : b }
+    {
+      n = split(w, A, ""); m = split($0, B, "")
+      for (i = 0; i <= n; i++) d[i, 0] = i
+      for (j = 0; j <= m; j++) d[0, j] = j
+      for (i = 1; i <= n; i++)
+        for (j = 1; j <= m; j++)
+          d[i, j] = min(min(d[i-1, j] + 1, d[i, j-1] + 1), d[i-1, j-1] + (A[i] != B[j]))
+      if (d[n, m] <= 2) print d[n, m], $0
+    }' | sort -n | head -1 | cut -d' ' -f2
+}
+
+ARGS=''
+while [ $# -gt 0 ]; do
+  case $1 in
+    --json) JSON=1 ;;
+    -q | --quiet) QUIET=$((QUIET + 1)) ;;
+    -qq) QUIET=2 ;;
+    -v | --verbose) VERBOSE=$((VERBOSE + 1)) ;;
+    -vv) VERBOSE=2 ;;
+    -y | --yes) ASSUME_YES=1 ;;
+    --color) shift; COLOR=${1-auto} ;;
+    --color=*) COLOR=${1#--color=} ;;
+    --version) printf '%s %s\n' "$ME" "$VERSION"; exit 0 ;;
+    -h) paint; short_help; exit 0 ;;
+    --help | help) paint; long_help; exit 0 ;;
+    --) shift; while [ $# -gt 0 ]; do ARGS="$ARGS $1"; shift; done; break ;;
+    -*) paint; fail ink::unknown_flag "unknown flag $1" "run \`$ME -h\`" 2 ;;
+    *) ARGS="$ARGS $1" ;;
+  esac
+  shift
+done
+
+paint
+IDENTITY=${INK_IDENTITY:-identity.txt}
+
+# shellcheck disable=SC2086
+set -- $ARGS
+[ $# -ge 1 ] || { short_help; exit 2; }
+
+want=$1
+shift
+
+if commands | grep -qx -- "$want"; then
+  "run_$want" "$@"
+else
+  near=$(suggest "$want")
+  if [ -n "$near" ]; then
+    fail ink::unknown_command "unknown command '$want'" "did you mean '$near'?" 2
+  else
+    fail ink::unknown_command "unknown command '$want'" "run \`$ME -h\`" 2
+  fi
+fi
